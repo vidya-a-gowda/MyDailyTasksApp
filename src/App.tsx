@@ -1,19 +1,33 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const STORAGE_KEY = 'daily-task-app-v1'
 
-const createId = () =>
+type TaskCategory = 'Personal' | 'Work' | 'Health' | 'Study' | 'Errands'
+type TaskPriority = 'Low' | 'Medium' | 'High'
+type TaskFilter = 'all' | 'active' | 'completed'
+
+type Task = {
+  id: string
+  title: string
+  notes: string
+  category: TaskCategory
+  priority: TaskPriority
+  completed: boolean
+  createdAt: string
+}
+
+const createId = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `task-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-const getStarterTasks = () => [
+const getStarterTasks = (): Task[] => [
   {
     id: createId(),
     title: 'Plan the day',
     notes: 'Review priorities and set one key win for today.',
-    category: 'Focus',
+    category: 'Personal',
     priority: 'High',
     completed: false,
     createdAt: new Date().toISOString(),
@@ -38,7 +52,26 @@ const getStarterTasks = () => [
   },
 ]
 
-const formatToday = () =>
+const isTaskArray = (value: unknown): value is Task[] =>
+  Array.isArray(value) &&
+  value.every((task) => {
+    if (!task || typeof task !== 'object') {
+      return false
+    }
+
+    const candidate = task as Partial<Task>
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.title === 'string' &&
+      typeof candidate.notes === 'string' &&
+      typeof candidate.category === 'string' &&
+      typeof candidate.priority === 'string' &&
+      typeof candidate.completed === 'boolean' &&
+      typeof candidate.createdAt === 'string'
+    )
+  })
+
+const formatToday = (): string =>
   new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'short',
@@ -46,27 +79,27 @@ const formatToday = () =>
   }).format(new Date())
 
 function App() {
-  const [tasks, setTasks] = useState(() => {
+  const [tasks, setTasks] = useState<Task[]>(() => {
     try {
-      const savedTasks = localStorage.getItem(STORAGE_KEY)
+      const savedTasks = window.localStorage.getItem(STORAGE_KEY)
       if (!savedTasks) {
         return getStarterTasks()
       }
 
-      const parsed = JSON.parse(savedTasks)
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : getStarterTasks()
+      const parsed = JSON.parse(savedTasks) as unknown
+      return isTaskArray(parsed) && parsed.length > 0 ? parsed : getStarterTasks()
     } catch {
       return getStarterTasks()
     }
   })
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
-  const [category, setCategory] = useState('Personal')
-  const [priority, setPriority] = useState('Medium')
-  const [filter, setFilter] = useState('all')
+  const [category, setCategory] = useState<TaskCategory>('Personal')
+  const [priority, setPriority] = useState<TaskPriority>('Medium')
+  const [filter, setFilter] = useState<TaskFilter>('all')
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
   }, [tasks])
 
   const stats = useMemo(() => {
@@ -91,7 +124,7 @@ function App() {
     return tasks
   }, [filter, tasks])
 
-  const addTask = (event) => {
+  const addTask = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
@@ -99,7 +132,7 @@ function App() {
       return
     }
 
-    const newTask = {
+    const newTask: Task = {
       id: createId(),
       title: trimmedTitle,
       notes: notes.trim(),
@@ -116,7 +149,7 @@ function App() {
     setPriority('Medium')
   }
 
-  const toggleTask = (taskId) => {
+  const toggleTask = (taskId: string) => {
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
         task.id === taskId ? { ...task, completed: !task.completed } : task,
@@ -124,7 +157,7 @@ function App() {
     )
   }
 
-  const deleteTask = (taskId) => {
+  const deleteTask = (taskId: string) => {
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId))
   }
 
@@ -200,14 +233,14 @@ function App() {
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Add a few details or context"
-              rows="3"
+              rows={3}
             />
           </div>
 
           <div className="task-form-row">
             <label>
               <span>Category</span>
-              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select value={category} onChange={(event) => setCategory(event.target.value as TaskCategory)}>
                 <option>Personal</option>
                 <option>Work</option>
                 <option>Health</option>
@@ -218,7 +251,7 @@ function App() {
 
             <label>
               <span>Priority</span>
-              <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+              <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
                 <option>Low</option>
                 <option>Medium</option>
                 <option>High</option>
@@ -234,7 +267,7 @@ function App() {
         <div className="list-toolbar">
           <span className="list-title">Tasks</span>
           <div className="filters" aria-label="Task filters">
-            {['all', 'active', 'completed'].map((option) => (
+            {(['all', 'active', 'completed'] as const).map((option) => (
               <button
                 key={option}
                 type="button"
